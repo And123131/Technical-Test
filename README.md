@@ -9,13 +9,13 @@ Service for ingesting, storing, versioning, soft-deleting, and exporting index c
 ## 2. Technologies
 
 - **Python**
-- **FastAPI** — REST API framework
-- **PostgreSQL** — relational database
-- **psycopg2** — PostgreSQL database driver
-- **python-dotenv** — environment variable management
-- **csv** — Python standard library for CSV processing
-- **Pytest** — automated testing
-- **Uvicorn** — ASGI server
+- **FastAPI** - REST API framework
+- **PostgreSQL** - relational database
+- **psycopg2** - PostgreSQL database driver
+- **python-dotenv** - environment variable management
+- **csv** - Python standard library for CSV processing
+- **Pytest** - automated testing
+- **Uvicorn** - ASGI server
 
 ## 3. Project Structure
 
