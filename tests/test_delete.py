@@ -2,7 +2,6 @@ from app import database
 
 
 def test_delete_existing_row(client):
-    # First upload a row
     csv_content = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Test Company,10.5,100,2026-01-01\n"
@@ -45,7 +44,6 @@ def test_delete_existing_row(client):
     cursor.close()
     conn.close()
 
-    # The row must still exist
     assert row is not None
 
     # The row must be marked as deleted

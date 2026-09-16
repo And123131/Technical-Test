@@ -1,5 +1,4 @@
 def test_export_json(client):
-    # First upload a row
     csv_content = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Test Company,10.5,100,2026-01-01\n"
@@ -18,7 +17,6 @@ def test_export_json(client):
 
     assert upload_response.status_code == 200
 
-    # Request the data as JSON
     response = client.get(
         "/export/?from_date=2026-01-01&to_date=2026-01-01&format=json"
     )
@@ -27,7 +25,6 @@ def test_export_json(client):
 
     data = response.json()
 
-    # We uploaded one row, so export should contain one row
     assert len(data) == 1
 
     # Check the exported values
@@ -42,7 +39,6 @@ def test_export_json(client):
 
 
 def test_export_csv(client):
-    # First upload a row
     csv_content = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Test Company,10.5,100,2026-01-01\n"
@@ -61,23 +57,19 @@ def test_export_csv(client):
 
     assert upload_response.status_code == 200
 
-    # Request the data as CSV
     response = client.get(
         "/export/?from_date=2026-01-01&to_date=2026-01-01&format=csv"
     )
 
     assert response.status_code == 200
 
-    # Check that the response is a CSV file
     assert response.headers["content-type"].startswith("text/csv")
 
     # Read the CSV content
     csv_output = response.text
 
-    # Check the header
     assert "id,index_code,isin,ticker,name,weight,shares,effective_date,loaded_at" in csv_output
 
-    # Check the exported row
     assert "1,TEST,TESTISIN,TEST,Test Company,10.5,100,2026-01-01" in csv_output
 
 
@@ -112,14 +104,13 @@ def test_export_respects_date_range(client):
 
     data = response.json()
 
-    # Only the January row should be returned
     assert len(data) == 1
     assert data[0]["index_code"] == "TEST1"
     assert data[0]["effective_date"] == "2026-01-01"
 
 
 def test_export_excludes_deleted_row(client):
-    # First upload a row
+
     csv_content = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Test Company,10.5,100,2026-01-01\n"
@@ -138,7 +129,6 @@ def test_export_excludes_deleted_row(client):
 
     assert upload_response.status_code == 200
 
-    # Delete the row using the API
     delete_response = client.delete("/delete/1")
 
     assert delete_response.status_code == 200
@@ -157,7 +147,6 @@ def test_export_excludes_deleted_row(client):
 
 
 def test_export_returns_latest_version(client):
-    # Upload the first version
     first_csv = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Old Company Name,10.5,100,2026-01-01\n"
@@ -176,8 +165,7 @@ def test_export_returns_latest_version(client):
 
     assert first_response.status_code == 200
 
-    # Upload a second version with the same business key
-    # but different data
+    # second version with the same business key but different data
     second_csv = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,New Company Name,20.5,200,2026-01-01\n"
@@ -196,7 +184,6 @@ def test_export_returns_latest_version(client):
 
     assert second_response.status_code == 200
 
-    # Export the data
     response = client.get(
         "/export/?from_date=2026-01-01&to_date=2026-01-01&format=json"
     )
@@ -215,7 +202,6 @@ def test_export_returns_latest_version(client):
 
 
 def test_export_returns_previous_version_when_latest_is_deleted(client):
-    # Upload the first version
     first_csv = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,Old Company Name,10.5,100,2026-01-01\n"
@@ -234,7 +220,7 @@ def test_export_returns_previous_version_when_latest_is_deleted(client):
 
     assert first_response.status_code == 200
 
-    # Upload the second version with the same business key
+    # second version with the same business key
     second_csv = (
         "index_code,isin,ticker,name,weight,shares,effective_date\n"
         "TEST,TESTISIN,TEST,New Company Name,20.5,200,2026-01-01\n"
@@ -258,7 +244,6 @@ def test_export_returns_previous_version_when_latest_is_deleted(client):
 
     assert delete_response.status_code == 200
 
-    # Export the data
     response = client.get(
         "/export/?from_date=2026-01-01&to_date=2026-01-01&format=json"
     )

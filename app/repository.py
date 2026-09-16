@@ -31,13 +31,11 @@ def insert_rows(batches):
 
             rows_inserted += len(batch)
 
-        # Commit only after ALL batches succeeded
         conn.commit()
 
         return rows_inserted
 
     except Exception:
-        # Undo ALL batches if any batch fails
         conn.rollback()
         raise
 

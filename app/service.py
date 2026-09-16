@@ -14,8 +14,6 @@ BATCH_SIZE = 500
 
 
 def process_csv(file):
-
-    # Check file extension
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(
             status_code=400,
@@ -31,7 +29,6 @@ def process_csv(file):
 
     reader = csv.DictReader(text_file)
 
-    # Check CSV columns
     if not reader.fieldnames:
         raise HTTPException(
             status_code=400,
@@ -145,14 +142,12 @@ def delete_row(row_id):
 
 
 def export_data(from_date, to_date, format):
-    # Check that the date range is valid
     if from_date > to_date:
         raise HTTPException(
             status_code=400,
             detail="'from_date' must be before or equal to 'to_date'"
         )
 
-    # Check the requested export format
     if format not in {"json", "csv"}:
         raise HTTPException(
             status_code=400,
@@ -181,21 +176,17 @@ def export_data(from_date, to_date, format):
     if format == "json":
         def generate_json():
             try:
-                # Start the JSON array
                 yield "["
 
                 first_row = True
 
                 while True:
-                    # Read up to 500 rows at a time
                     rows = cursor.fetchmany(500)
 
-                    # Stop when there are no more rows
                     if not rows:
                         break
 
                     for row in rows:
-                        # Convert the database row into a dictionary
                         data = dict(zip(columns, row))
 
                         # Add a comma before every row except the first one
@@ -210,11 +201,9 @@ def export_data(from_date, to_date, format):
 
                         first_row = False
 
-                # Finish the JSON array
                 yield "]"
 
             finally:
-                # Close database resources after streaming finishes
                 cursor.close()
                 conn.close()
 
@@ -236,10 +225,8 @@ def export_data(from_date, to_date, format):
             yield output.getvalue()
 
             while True:
-                # Read up to 500 rows at a time
                 rows = cursor.fetchmany(500)
 
-                # Stop when there are no more rows
                 if not rows:
                     break
 
@@ -254,7 +241,6 @@ def export_data(from_date, to_date, format):
                 yield output.getvalue()
 
         finally:
-            # Close database resources after streaming finishes
             cursor.close()
             conn.close()
 

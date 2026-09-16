@@ -1,13 +1,9 @@
-# Technical Test — Python + PostgreSQL
+# Index Constituents API - Python + PostgreSQL
 
 ## 1. Overview
-The application:
+**The application:**
 
-- accepts CSV files through an API endpoint;
-- validates and stores the CSV data in PostgreSQL;
-- supports soft deletion without physically removing data from the database;
-- exports the current version of records for a requested date range;
-- supports JSON and CSV export formats.
+Service for ingesting, storing, versioning, soft-deleting, and exporting index constituent data using Fast API and PostgreSQL.
 
 
 ## 2. Technologies
@@ -52,7 +48,7 @@ The application is separated into several layers:
 * api.py — API routes;
 * service.py — Functionality of application;
 * repository.py — PostgreSQL queries;
-* database.py — database configuration, connection handling, tablecreation;
+* database.py — database configuration, connection handling, table creation;
 * tests/ — behavior tests.
 
 ## 4. Requirements
@@ -166,7 +162,7 @@ Required query parameters:
 ```text
 from_date
 to_date
-format
+format (optional and defaults to JSON)
 ```
 
 Supported formats:
@@ -187,8 +183,8 @@ Example response:
         "isin": "DE0007164600",
         "ticker": "SAP",
         "name": "SAP SE",
-        "weight": 10.5,
-        "shares": 1000,
+        "weight": "10.5",
+        "shares": "1000",
         "effective_date": "2026-01-01",
         "loaded_at": "2026-09-15T12:00:00"
     }
@@ -210,45 +206,8 @@ Invalid dates or unsupported formats are rejected with HTTP ```422```.
 
 An invalid date range, where ```from_date``` is later than ```to_date```, returns HTTP ```400```.
 
-## 8. Data Model
-The application uses the following PostgreSQL table: ```index_constituents```
 
-| Column           | Type        | Description                                      |
-|------------------|-------------|--------------------------------------------------|
-| `id`             | `BIGSERIAL` | Unique database row ID                           |
-| `index_code`     | `TEXT`      | Index identifier                                 |
-| `isin`           | `TEXT`      | Security identifier                              |
-| `ticker`         | `TEXT`      | Security ticker                                  |
-| `name`           | `TEXT`      | Security name                                    |
-| `weight`         | `NUMERIC`   | Index weight                                     |
-| `shares`         | `NUMERIC`   | Number of shares                                 |
-| `effective_date` | `DATE`      | Date for which the constituent data is effective |
-| `loaded_at`      | `TIMESTAMP` | Time when the row was loaded                     |
-| `deleted`        | `BOOLEAN`   | Indicates whether the row has been soft-deleted  |
-
-The database uses: ```id``` as the physical primary key.
-
-## 9. Technical Decisions
-### 9.1 Business Key and Versioning
-The business key is: ```(index_code, isin, effective_date)```
-<br />The database does not enforce this combination as a unique constraint.
-
-This is intentional because the same business key can be loaded multiple times and historical versions must be preserved.
-
-When multiple non-deleted records have the same business key, the newest ```loaded_at``` value is considered the current version.
-
-
-### 9.2 CSV Upload Strategy
-
-Rows are processed incrementally instead of loading the complete CSV file into a Python list.
-<br />This reduces application memory usage for larger uploads.
-
-### 9.3 Batch Insertion
-Rows are collected into batches of 500: ```BATCH_SIZE = 500```
-<br />This provides better insertion performance than going through every CSV row.
-
-
-### 9.5 Soft Delete
+### 7.4 Soft Delete
 Rows are never physically deleted from the database.
 <br />Instead, was used:
 ```text
@@ -290,6 +249,44 @@ If the specified ID does not exist:
 ```
 
 
+## 8. Data Model
+The application uses the following PostgreSQL table: ```index_constituents```
+
+| Column           | Type        | Description                                      |
+|------------------|-------------|--------------------------------------------------|
+| `id`             | `BIGSERIAL` | Unique database row ID                           |
+| `index_code`     | `TEXT`      | Index identifier                                 |
+| `isin`           | `TEXT`      | Security identifier                              |
+| `ticker`         | `TEXT`      | Security ticker                                  |
+| `name`           | `TEXT`      | Security name                                    |
+| `weight`         | `NUMERIC`   | Index weight                                     |
+| `shares`         | `NUMERIC`   | Number of shares                                 |
+| `effective_date` | `DATE`      | Date for which the constituent data is effective |
+| `loaded_at`      | `TIMESTAMP` | Time when the row was loaded                     |
+| `deleted`        | `BOOLEAN`   | Indicates whether the row has been soft-deleted  |
+
+The database uses: ```id``` as the physical primary key.
+
+## 9. Technical Decisions
+### 9.1 Business Key and Versioning
+The business key is: ```(index_code, isin, effective_date)```
+<br />The database does not enforce this combination as a unique constraint.
+
+This is intentional because the same business key can be loaded multiple times and historical versions must be preserved.
+
+When multiple non-deleted records have the same business key, the newest ```loaded_at``` value is considered the current version.
+
+
+### 9.2 CSV Upload Strategy
+
+Rows are processed incrementally instead of loading the complete CSV file into a Python list.
+<br />This reduces application memory usage for larger uploads.
+
+### 9.3 Batch Insertion
+Rows are collected into batches of 500: ```BATCH_SIZE = 500```
+<br />This provides better insertion performance than going through every CSV row.
+
+
 ## 10. Transactions and Error Handling
 If any error occurs while processing the upload - it will roll back.
 
@@ -315,6 +312,14 @@ This supports queries that filter data by ```effective_date```, which is used by
 * filtering by ```effective_date```;
 * grouping/filtering by the business key.
 
+
+## 12.Alternatives Considered
+PostgreSQL ```COPY```
+<br />```COPY``` would provide very high-performance bulk loading.
+
+Instead, execute_values() is used with batches of 500 rows.
+<br />Soft deletion was chosen to preserve history and allow recovery.
+<br />Physical delete was rejected because data must remain recoverable.
 
 ## 14. Testing
 The project contains automated tests implemented with ```pytest```.
