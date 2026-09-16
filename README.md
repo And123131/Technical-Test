@@ -13,7 +13,7 @@ The application:
 - exports the current version of records for a requested date range;
 - supports JSON and CSV export formats.
 
-The implementation was developed as part of the BITA Technical Selection Process.
+The implementation was developed as part of Technical Selection Process.
 
 ## 2. Technologies
 
@@ -23,19 +23,42 @@ The implementation was developed as part of the BITA Technical Selection Process
 - **psycopg2** — PostgreSQL database driver
 - **python-dotenv** — environment variable management
 - **csv** — Python standard library for CSV processing
+- **Pytest** — automated testing
 - **Uvicorn** — ASGI server
 
 ## 3. Project Structure
 
 ```text
-ThTst/
-├── .venv/
-├── database.py
-├── main.py
+Project/
+├── app/
+│   ├── __init__.py
+│   ├── api.py
+│   ├── database.py
+│   ├── main.py
+│   ├── repository.py
+│   └── service.py
+│
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── test_delete.py
+│   ├── test_export.py
+│   └── test_upload.py
+│
+├── .gitignore
+├── pytest.ini
 ├── README.md
 └── requirements.txt
 ```
 ```.env``` is not committed to the repository because it contains database credentials.
+
+The application is separated into several layers:
+* main.py — FastAPI application setup and database initialization on application startup;
+* api.py — API routes and request parameter validation;
+* service.py — CSV processing, validation, and business logic;
+* repository.py — PostgreSQL queries and persistence operations;
+* database.py — database configuration, connection handling, table and index creation;
+* tests/ — automated API and behavior tests.
 
 ## 4. Requirements
 
@@ -79,12 +102,14 @@ Create a PostgreSQL database named:
 <br />```index_constituents```
 <br />The application automatically creates the required table and indexes when it starts.
 
+Also create a PostgreSQL database named `index_constituents_test` for tests.
+
 ## 6. Running the Application
 Start the FastAPI application with:
-<br />```uvicorn main:app --reload```
+<br />```uvicorn app.main:app --reload```
 
 The API will be available at:
-<br />```The API will be available at:```
+<br />```http://127.0.0.1:8000```
 
 Interactive Swagger documentation is available at:
 <br />```http://127.0.0.1:8000/docs```
@@ -100,7 +125,7 @@ Returns a simple message confirming that the API is running.
 <br />Example response:
 ```text
 {
-    "message": "BITA Technical Test API"
+    "message": "Test API"
 }
 ```
 
@@ -130,10 +155,12 @@ The endpoint:
 1. validates that the uploaded file has a ```.csv``` extension;
 2. reads the file as UTF-8 text;
 3. validates the required columns;
-4. processes rows one by one;
+4. reads rows incrementally using csv.DictReader;
 5. validates dates and numeric values;
-6. inserts rows into PostgreSQL in batches;
-7. commits the complete upload as one transaction.
+6. converts numeric values to Decimal;
+7. collects rows into batches;
+8. inserts batches into PostgreSQL using execute_values();
+9. commits the complete upload as one database transaction.
 
 Successful response:
 ```text
@@ -142,7 +169,10 @@ Successful response:
     "rows_inserted": 2
 }
 ```
-The application does not overwrite existing rows. Re-uploading the same data creates additional records so that loading history is preserved.
+Existing rows are never overwritten.
+
+Uploading the same business key again creates a new database record so that the loading history is preserved.
+
 
 ### 7.3 Delete a Row
 Endpoint:
@@ -154,12 +184,13 @@ Example:
 DELETE /delete/123
 ```
 The API does not physically delete the database row.
-<br />Instead, it sets:
+<br />Instead, it performs a **Soft Delete**:
 ```
-deleted = TRUE
+UPDATE index_constituents
+SET deleted = TRUE
+WHERE id = %s
 ```
-The row therefore remains available in the database for historical purposes and potential recovery.
-<br />It calls **Soft Delete**.
+The original row therefore remains in the database.
 
 Successful response:
 ```text
@@ -196,7 +227,7 @@ json
 csv
 ```
 
-JSON example:
+**JSON** example:
 ```GET /export/?from_date=2026-01-01&to_date=2026-01-31&format=json```
 
 Example response:
@@ -216,15 +247,20 @@ Example response:
 ]
 ```
 
-CSV example: ```GET /export/?from_date=2026-01-01&to_date=2026-01-31&format=csv```
+**CSV** example: ```GET /export/?from_date=2026-01-01&to_date=2026-01-31&format=csv```
 
 The CSV response is returned as a downloadable file named: ```export.csv```
 
 The export:
-* filters records by ```effective_date```;
+* filters records by `effective_date` using an inclusive date range;
 * excludes soft-deleted records;
-* resolves multiple records with the same business key;
-* returns only the current version of each business key.
+* groups records by the business key;
+* selects the latest non-deleted version of each business key;
+* returns the resulting records in the requested format.
+
+Invalid dates or unsupported formats are rejected by FastAPI validation with HTTP ```422```.
+
+An invalid date range, where ```from_date``` is later than ```to_date```, returns HTTP ```400```.
 
 ## 8. Data Model
 The application uses the following PostgreSQL table: ```index_constituents```
@@ -251,7 +287,8 @@ The business key is: ```(index_code, isin, effective_date)```
 
 <br />This is intentional because the same business key can be loaded multiple times and historical versions must be preserved.
 
-When multiple records have the same business key, the API determines the current version using:
+When multiple non-deleted records have the same business key, the newest record is considered the current version.
+<br />The API determines the current version using:
 <br /> ```ORDER BY loaded_at DESC, id DESC```
 
 The newest ```loaded_at``` value is considered the latest version.
@@ -268,9 +305,8 @@ and returns only: ```row_number = 1```
 <br /> This means that repeated uploads do not overwrite previous data.
 
 ### 9.2 CSV Upload Strategy
-The application uses FastAPI's ```UploadFile```.
-
-Instead of loading the entire uploaded file into memory, the file is processed through:
+FastAPI's ```UploadFile``` is used for file uploads.
+<br />Instead of loading the entire uploaded file into memory, the file is processed through:
 ```text
 io.TextIOWrapper(
     file.file,
@@ -278,14 +314,15 @@ io.TextIOWrapper(
     newline=""
 )
 ```
-The CSV is then read row by row using Python's: ```csv.DictReader```
-<br />This approach avoids unnecessarily loading the complete CSV file into Python memory.
+The CSV is then processed using: ```csv.DictReader```
+<br />Rows are processed incrementally instead of loading the complete CSV file into a Python list.
+
+This reduces application memory usage for larger uploads.
 
 ### 9.3 Batch Insertion
-Rows are collected into batches of 500: ```batch_size = 500```
+Rows are collected into batches of 500: ```BATCH_SIZE = 500```
 <br />The application uses: ```execute_values()``` from ```psycopg2.extras``` to insert each batch efficiently.
 <br />This provides better insertion performance than executing one SQL ```INSERT``` statement for every CSV row.
-<br />The implementation intentionally does not use PostgreSQL's ```COPY``` command or another native bulk-import mechanism.
 
 ### 9.4 Numeric Values
 The PostgreSQL columns ```weight``` and ```shares``` use: ```NUMERIC```
@@ -317,8 +354,12 @@ ROW_NUMBER() OVER (
 ```
 Only records with: ```row_number = 1``` are returned.
 
-### 9.7 CSV Export Streaming
-For CSV exports, the application uses a PostgreSQL server-side cursor:
+<br /> Importantly, version resolution is performed only among non-deleted records.
+
+Therefore, if the latest version is soft-deleted, the previous non-deleted version becomes the current exported version
+
+### 9.7 Streaming Export
+For both JSON and CSV exports, the application uses a PostgreSQL server-side cursor:
 ```conn.cursor(name="export_cursor")```
 
 <br />Results are retrieved in batches: ```cursor.fetchmany(500)``` and written to the response incrementally using a generator and ```StreamingResponse```.
@@ -326,15 +367,6 @@ For CSV exports, the application uses a PostgreSQL server-side cursor:
 This prevents the complete export from being loaded into Python memory at once.
 
 The database cursor and connection are closed after the streaming generator finishes.
-
-### 9.8 JSON Export
-JSON exports also use a server-side cursor and: ```fetchmany(500)``` to read database results in batches.
-<br />The resulting records are then collected into a Python list before being returned as a JSON response.
-
-This means the database results are fetched incrementally, although the final JSON response is held in memory.
-
-This is a deliberate trade-off to keep the JSON endpoint simple while still avoiding a large database ```fetchall()``` operation.
-
 
 ## 10. Transactions and Error Handling
 CSV uploads are processed inside a single database transaction.
@@ -349,6 +381,7 @@ For example, if a CSV contains two valid rows followed by an invalid row, the fi
 The API returns appropriate HTTP errors for common input problems, including:
 * invalid file type;
 * empty CSV;
+* CSV containing headers but no data;
 * missing CSV columns;
 * invalid dates;
 * invalid numeric values;
@@ -356,6 +389,7 @@ The API returns appropriate HTTP errors for common input problems, including:
 * unsupported export formats;
 * non-existent row IDs.
 
+FastAPI performs request-level validation for typed API parameters such as dates and supported export formats.
 
 ## 11. Database Indexes
 Two indexes are created: **Effective date index**
@@ -363,14 +397,16 @@ Two indexes are created: **Effective date index**
 CREATE INDEX IF NOT EXISTS idx_index_constituents_effective_date
 ON index_constituents (effective_date)
 ```
-This supports queries that filter data by effective_date, which is used by the export endpoint.
+This supports queries that filter data by ```effective_date```, which is used by the export endpoint.
 
 **Business key index**
 ```text
 CREATE INDEX IF NOT EXISTS idx_index_constituents_business_key
 ON index_constituents (index_code, isin, effective_date)
 ```
-This supports operations involving the business key used for current-version resolution.
+This index supports queries that filter or organize records by the business key used for current-version resolution.
+
+The indexes are created with: ```CREATE INDEX IF NOT EXISTS``` so application startup can be run repeatedly without attempting to recreate existing indexes.
 
 The indexes are created automatically when the application starts.
 
@@ -381,22 +417,27 @@ Several decisions were made to avoid unnecessary memory usage and improve databa
 **Upload**
 <br />The upload process:
 * reads the file incrementally;
-* does not load the entire CSV into memory;
+* avoids loading the complete file into memory;
+* validates rows while processing them;
 * inserts rows in batches of 500;
 * uses ```execute_values()``` instead of one INSERT statement per row.
+* uses one database transaction for the complete upload.
 
 **Export**
 <br />The CSV export:
+* filters data in PostgreSQL;
+* resolves the current version in SQL;
 * uses a server-side database cursor;
 * fetches rows in batches of 500;
-* streams the response to the client.
+* streams CSV responses using ```StreamingResponse```;
+* streams JSON responses incrementally.
 
-Therefore, a large CSV export does not need to be fully loaded into application memory.
+This allows the application to handle larger exports without requiring the entire result set to be loaded into application memory.
 
 **Database**
 <br />Indexes are created for the main query patterns:
-* filtering by effective_date;
-* grouping by the business key.
+* filtering by ```effective_date```;
+* grouping/filtering by the business key.
 
 
 ## 13. Alternatives Considered
@@ -408,6 +449,11 @@ However, it was intentionally not used because the technical test explicitly exc
 Instead, ```execute_values()``` is used with batches of 500 rows.
 
 **One INSERT per row**
+<br />Executing one SQL ```INSERT``` statement for every CSV row would be simpler to implement.
+
+However, this would require significantly more database round trips for larger files.
+
+Batch insertion with ```execute_values()``` was therefore selected.
 <br />Physical deletion would be simpler:
 ```text
 DELETE FROM index_constituents
@@ -426,14 +472,17 @@ Therefore, the business key is handled at the application/query level instead.
 
 
 ## 14. Testing
-The API was manually tested through the FastAPI Swagger documentation.
-<br />The following cases were tested:
+The project contains automated tests implemented with ```pytest```.
+<br /> Run the complete test suite with: ```pytest```
+
+The current test suite contains 18 automated tests covering the following behaviors:
+
 * non-CSV file upload;
 * completely empty CSV;
 * CSV containing headers but no data rows;
-* missing required CSV column;
-* invalid date;
-* invalid numeric value;
+* missing required CSV columns;
+* invalid dates;
+* invalid numeric values;
 * transaction rollback after an invalid row;
 * deletion of a non-existent row;
 * repeated deletion of the same row;
@@ -443,33 +492,38 @@ The API was manually tested through the FastAPI Swagger documentation.
 * export with no matching records;
 * JSON export;
 * CSV export;
-* inclusive date range filtering;
+* inclusive date-range filtering;
 * repeated upload of the same data;
 * current-version resolution after repeated uploads;
-* deletion and current-version behavior.
+* previous-version resolution after deleting the latest version.
+
+The API was also manually tested through FastAPI Swagger documentation.
 
 
 ## 15. Possible Improvements
 For a production system, several additional improvements could be considered:
-* add automated unit and integration tests with pytest;
 * add structured application logging;
 * add more detailed validation for empty required CSV fields;
 * add authentication and authorization;
-* use a more advanced configuration management approach for production environments;
 
 These improvements were not necessary for the scope of the technical test but could be appropriate for a production environment.
 
 
 ## 16. Summary
 The implementation focuses on:
-* clear API design;
+* clear REST API design;
+* layered application structure;
 * reliable CSV validation;
+* incremental CSV processing;
 * efficient batch insertion;
 * PostgreSQL persistence;
 * historical data preservation;
 * recoverable soft deletion;
 * deterministic current-version resolution;
-* efficient CSV streaming;
-* reasonable database indexing.
+* server-side database cursors;
+* streaming exports;
+* appropriate database indexing;
+* transaction safety;
+* automated API tests.
 
 The implementation intentionally favors a simple and understandable architecture while addressing the main functional and performance requirements of the technical test.

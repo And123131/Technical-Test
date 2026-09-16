@@ -55,7 +55,8 @@ def create_tables():
         conn.commit()
 
     except Exception:
-        # to rollback and have ability to close connection
+        # roll back the transaction if an error occurs.
+        # the connection is closed in the finally block.
         conn.rollback()
         raise
 
