@@ -321,7 +321,7 @@ Instead, execute_values() is used with batches of 500 rows.
 <br />Soft deletion was chosen to preserve history and allow recovery.
 <br />Physical delete was rejected because data must remain recoverable.
 
-## 14. Testing
+## 13. Testing
 The project contains automated tests implemented with ```pytest```.
 <br /> Run the complete test suite with: ```pytest```
 

@@ -56,9 +56,7 @@ def process_csv(file):
     def generate_batches():
         batch = []
 
-        # Process CSV row by row
         for row in reader:
-
             try:
                 effective_date = datetime.strptime(
                     row["effective_date"],
@@ -110,7 +108,7 @@ def process_csv(file):
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=f"Database error: {error}"
+            detail=f"Internal server error"
         )
 
     if rows_inserted == 0:
