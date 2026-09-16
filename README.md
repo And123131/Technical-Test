@@ -3,7 +3,7 @@
 ## 1. Overview
 **The application:**
 
-Service for ingesting, storing, versioning, soft-deleting, and exporting index constituent data using Fast API and PostgreSQL.
+Service for ingesting, storing, versioning, soft-deleting, and exporting index constituent data using FastAPI and PostgreSQL.
 
 
 ## 2. Technologies
@@ -46,7 +46,7 @@ Project/
 The application is separated into several layers:
 * main.py - FastAPI application startup;
 * api.py - API routes;
-* service.py - Functionality of application;
+* service.py - application/business logic;
 * repository.py - PostgreSQL queries;
 * database.py - database configuration, connection handling, table creation;
 * tests/ - behavior tests.
@@ -209,7 +209,7 @@ An invalid date range, where ```from_date``` is later than ```to_date```, return
 
 ### 7.4 Soft Delete
 Rows are never physically deleted from the database.
-<br />Instead, was used:
+<br />Soft deletion is implemented with:
 ```text
 UPDATE index_constituents
 SET deleted = TRUE
@@ -229,7 +229,6 @@ Example:
 ```text
 DELETE /delete/123
 ```
-<br />After, it performs a **Soft Delete**: The original row therefore remains in the database.
 
 Successful response:
 ```text

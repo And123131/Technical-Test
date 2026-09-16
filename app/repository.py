@@ -58,7 +58,6 @@ def soft_delete_row(row_id):
             (row_id,)
         )
 
-        # Check whether a row with this ID exists
         if cursor.rowcount == 0:
             return False
 

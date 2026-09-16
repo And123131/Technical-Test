@@ -105,7 +105,7 @@ def process_csv(file):
             detail="CSV file must use UTF-8 encoding"
         )
 
-    except Exception as error:
+    except Exception:
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error"
@@ -191,7 +191,7 @@ def export_data(from_date, to_date, format):
                         if not first_row:
                             yield ","
 
-                        # Convert the dictionary to JSON
+
                         yield json.dumps(
                             data,
                             default=str
