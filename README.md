@@ -44,12 +44,12 @@ Project/
 ```.env``` is not committed to the repository because it contains database credentials.
 
 The application is separated into several layers:
-* main.py — FastAPI application startup;
-* api.py — API routes;
-* service.py — Functionality of application;
-* repository.py — PostgreSQL queries;
-* database.py — database configuration, connection handling, table creation;
-* tests/ — behavior tests.
+* main.py - FastAPI application startup;
+* api.py - API routes;
+* service.py - Functionality of application;
+* repository.py - PostgreSQL queries;
+* database.py - database configuration, connection handling, table creation;
+* tests/ - behavior tests.
 
 ## 4. Requirements
 
