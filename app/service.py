@@ -179,7 +179,6 @@ def export_data(from_date, to_date, format):
 
     # JSON export
     if format == "json":
-
         def generate_json():
             try:
                 # Start the JSON array
