@@ -1,6 +1,6 @@
 import os
 
-import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
 from dotenv import load_dotenv
 
 
@@ -15,9 +15,19 @@ DB_CONFIG = {
     "password": os.getenv("DATABASE_PASSWORD"),
 }
 
+connection_pool = ThreadedConnectionPool(
+    minconn=1,
+    maxconn=10,
+    **DB_CONFIG
+)
+
 
 def get_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    return connection_pool.getconn()
+
+
+def release_connection(conn):
+    connection_pool.putconn(conn)
 
 
 def create_tables():

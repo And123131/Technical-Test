@@ -1,6 +1,6 @@
 from psycopg2.extras import execute_values
 
-from app.database import get_connection
+from app.database import get_connection, release_connection
 
 
 def insert_rows(batches):
@@ -41,7 +41,7 @@ def insert_rows(batches):
 
     finally:
         cursor.close()
-        conn.close()
+        release_connection(conn)
 
 
 def soft_delete_row(row_id):
@@ -71,7 +71,7 @@ def soft_delete_row(row_id):
 
     finally:
         cursor.close()
-        conn.close()
+        release_connection(conn)
 
 
 def get_export_cursor(from_date, to_date):

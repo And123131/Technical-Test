@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.repository import insert_rows, soft_delete_row, get_export_cursor
+from app.database import release_connection
 
 # Number of CSV rows inserted into PostgreSQL per database operation.
 BATCH_SIZE = 500
@@ -214,7 +215,7 @@ def export_data(from_date, to_date, format):
 
             finally:
                 cursor.close()
-                conn.close()
+                release_connection(conn)
 
         return StreamingResponse(
             generate_json(),
@@ -251,7 +252,7 @@ def export_data(from_date, to_date, format):
 
         finally:
             cursor.close()
-            conn.close()
+            release_connection(conn)
 
     return StreamingResponse(
         generate_csv(),
