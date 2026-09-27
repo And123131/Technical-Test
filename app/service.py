@@ -78,12 +78,17 @@ def process_csv(file):
                     detail="Invalid date, weight, or shares value"
                 )
 
+            index_code = row["index_code"].strip()
+            isin = row["isin"].strip()
+            ticker = row["ticker"].strip()
+            name = row["name"].strip()
+
             batch.append(
                 (
-                    row["index_code"],
-                    row["isin"],
-                    row["ticker"],
-                    row["name"],
+                    index_code,
+                    isin,
+                    ticker,
+                    name,
                     weight,
                     shares,
                     effective_date
