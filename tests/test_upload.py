@@ -111,3 +111,24 @@ def test_upload_rejects_empty_csv(client):
     )
 
     assert response.status_code == 400
+
+
+def test_upload_rejects_empty_string_value(client):
+    csv_content = (
+        "index_code,isin,ticker,name,weight,shares,effective_date\n"
+        "   ,US1234567890,AAPL,Apple Inc,10.5,100,2026-01-01\n"
+    )
+
+    response = client.post(
+        "/upload-csv/",
+        files={
+            "file": (
+                "test.csv",
+                csv_content,
+                "text/csv"
+            )
+        }
+    )
+
+    assert response.status_code == 400
+    assert "Missing value" in response.json()["detail"]
