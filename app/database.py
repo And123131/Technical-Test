@@ -72,4 +72,4 @@ def create_tables():
 
     finally:
         cursor.close()
-        conn.close()
+        release_connection(conn)
