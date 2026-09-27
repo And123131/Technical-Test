@@ -57,6 +57,12 @@ def process_csv(file):
         batch = []
 
         for row in reader:
+            for col in required_columns:
+                if not row[col] or not row[col].strip():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Missing value in '{col}'"
+                    )
             try:
                 effective_date = datetime.strptime(
                     row["effective_date"],
@@ -108,7 +114,7 @@ def process_csv(file):
     except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error"
+            detail="Internal server error"
         )
 
     if rows_inserted == 0:
