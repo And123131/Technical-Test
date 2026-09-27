@@ -66,10 +66,10 @@ def create_tables():
 
     except Exception:
         # roll back the transaction if an error occurs.
-        # the connection is closed in the finally block.
         conn.rollback()
         raise
 
     finally:
         cursor.close()
+        # Return the connection to the pool in the finally block.
         release_connection(conn)
